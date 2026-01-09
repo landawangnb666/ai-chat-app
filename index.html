@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 对话助手 - 支持多模型</title>
+    <!-- 引入 marked.js -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif; 
+            background-color: #f4f4f9; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            color: #333; 
+        }
+        
+        .chat-container { 
+            width: 100%; 
+            max-width: 800px; 
+            height: 90vh; 
+            background-color: #fff; 
+            border-radius: 12px; 
+            box-shadow: 0 5px 25px rgba(0,0,0,0.1); 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+        }
+        
+        /* 头部样式 */
+        .chat-header { 
+            background: linear-gradient(135deg, #4a90e2, #357abd); 
+            color: white; 
+            padding: 15px 20px; 
+            display: flex; 
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header-left { 
+            display: flex; 
+            align-items: center; 
+            gap: 15px; 
+        }
+        .ai-avatar { 
+            width: 40px; 
+            height: 40px; 
+            border-radius: 50%; 
+            background: linear-gradient(135deg, #ff6b6b, #feca57);
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-size: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .header-info h2 { 
+            font-size: 1.2rem; 
+            font-weight: 600; 
+            margin: 0; 
+        }
+        .header-info p { 
+            font-size: 0.8rem; 
+            opacity: 0.9; 
+            margin: 2px 0 0 0; 
+        }
+        .header-right { display: flex; gap: 10px; }
+        .header-button { 
+            background: rgba(255,255,255,0.2); 
+            border: none; 
+            color: white; 
+            padding: 8px 16px; 
+            border-radius: 20px; 
+            cursor: pointer; 
+            font-size: 0.8rem;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .header-button:hover { 
+            background: rgba(255,255,255,0.3); 
+            transform: translateY(-1px);
+        }
+        
+        /* 模型选择下拉菜单 */
+        .model-selector {
+            position: relative;
+            display: inline-block;
+        }
+        #modelSelect {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            padding-right: 30px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            appearance: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        #modelSelect:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        #modelSelect option {
+            background: #4a90e2;
+            color: white;
+        }
+        .model-selector::after {
+            content: "▼";
+            position: absolute;
+            top: 50%;
+            right: 12px;
+            transform: translateY(-50%);
+            color: white;
+            font-size: 0.6rem;
+            pointer-events: none;
+        }
+        
+        /* 聊天区域样式 */
+        .chat-box { 
+            flex: 1; 
+            padding: 20px; 
+            overflow-y: auto; 
+            background: linear-gradient(180deg, #f5f7fa 0%, #e4e8f0 100%);
+            display: flex; 
+            flex-direction: column; 
+            gap: 20px; 
+        }
+        
+        /* 消息气泡容器 */
+        .message-container { 
+            display: flex; 
+            align-items: flex-start; 
+            gap: 12px; 
+            max-width: 100%; 
+        }
+        .message-container.user { 
+            flex-direction: row-reverse; 
+        }
+        
+        /* 头像样式 */
+        .avatar { 
+            width: 40px; 
+            height: 40px; 
+            border-radius: 50%; 
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .user-avatar { 
+            background: linear-gradient(135deg, #4a90e2, #357abd);
+            color: white;
+        }
+        .ai-avatar-small { 
+            background: linear-gradient(135deg, #ff6b6b, #feca57);
+            color: white;
+        }
+        
+        /* 消息气泡样式 */
+        .message-bubble { 
+            max-width: 70%; 
+            padding: 12px 16px; 
+            border-radius: 18px; 
+            font-size: 0.95rem; 
+            line-height: 1.6; 
+            position: relative;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .user-bubble { 
+            background: linear-gradient(135deg, #4a90e2, #357abd);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+        .ai-bubble { 
+            background: white; 
+            color: #333; 
+            border-bottom-left-radius: 4px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        /* Markdown 样式优化 */
+        .ai-bubble strong { color: #000; font-weight: 700; }
+        .ai-bubble ul { margin: 8px 0 8px 20px; }
+        .ai-bubble ol { margin: 8px 0 8px 20px; }
+        .ai-bubble li { margin-bottom: 4px; }
+        .ai-bubble pre { 
+            background: #2d2d2d; 
+            color: #ccc; 
+            padding: 12px; 
+            border-radius: 8px; 
+            overflow-x: auto; 
+            margin: 8px 0;
+            font-size: 0.85rem;
+        }
+        .ai-bubble code { 
+            background: #f0f0f0; 
+            padding: 2px 6px; 
+            border-radius: 4px; 
+            font-size: 0.85rem;
+        }
+        .ai-bubble pre code { background: none; padding: 0; }
+        
+        /* 时间戳样式 */
+        .timestamp { 
+            font-size: 0.75rem; 
+            color: #999; 
+            text-align: center; 
+            margin: 15px 0;
+            font-weight: 500;
+        }
+        .message-time {
+            font-size: 0.7rem;
+            opacity: 0.6;
+            margin-top: 6px;
+            text-align: right;
+        }
+        .message-container.ai .message-time { text-align: left; }
+        
+        /* 输入区域样式 */
+        .input-area { 
+            padding: 20px; 
+            background: white; 
+            border-top: 1px solid #e0e0e0; 
+            display: flex; 
+            gap: 12px; 
+            align-items: center;
+        }
+        #userInput { 
+            flex: 1; 
+            padding: 12px 18px; 
+            border: 2px solid #e0e0e0; 
+            border-radius: 25px; 
+            outline: none; 
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+        #userInput:focus { 
+            border-color: #4a90e2; 
+            background: white;
+            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+        }
+        #sendBtn { 
+            background: linear-gradient(135deg, #4a90e2, #357abd); 
+            color: white; 
+            border: none; 
+            padding: 12px 24px; 
+            border-radius: 25px; 
+            cursor: pointer; 
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(74, 144, 226, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #sendBtn:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(74, 144, 226, 0.4);
+        }
+        #sendBtn:disabled {
+            opacity: 0.6;
+            transform: none;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+        
+        /* 光标动画 */
+        .cursor::after { 
+            content: '▋'; 
+            display: inline-block; 
+            animation: blink 1s infinite; 
+            color: #4a90e2; 
+            font-weight: bold;
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+        
+        /* 欢迎消息 */
+        .welcome-message { 
+            text-align: center; 
+            color: #666; 
+            padding: 30px 20px;
+            font-style: italic; 
+            background: rgba(255,255,255,0.8);
+            border-radius: 12px;
+            margin: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        
+        /* 滚动条美化 */
+        .chat-box::-webkit-scrollbar { width: 6px; }
+        .chat-box::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
+        .chat-box::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
+        .chat-box::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+    </style>
+</head>
+<body>
+
+    <div class="chat-container">
+        <!-- 头部区域 -->
+        <div class="chat-header">
+            <div class="header-left">
+                <div class="ai-avatar">AI</div>
+                <div class="header-info">
+                    <h2>智能助手</h2>
+                    <p>在线 · 随时为您服务</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="model-selector">
+                    <select id="modelSelect" title="选择AI模型">
+                        <option value="deepseek/deepseek-v3.1-terminus">deepseek-v3.1-terminus</option>
+                        <option value="xiaomimimo/mimo-v2-flash">mimo-v2-flash</option>
+                        <option value="zai-org/glm-4.7">glm-4.7</option>
+                        <option value="qwen/qwen3-235b-a22b-instruct-2507">qwen3-235b</option>
+                        <option value="deepseek/deepseek-r1-0528">deepseek-r1</option>
+                    </select>
+                </div>
+                <button class="header-button" id="clearHistory" title="清空聊天记录">
+                    🗑️ 清空记录
+                </button>
+                <button class="header-button" id="exportHistory" title="导出聊天记录">
+                    📥 导出记录
+                </button>
+            </div>
+        </div>
+        
+        <!-- 聊天内容区域 -->
+        <div class="chat-box" id="chatBox">
+            <div id="streamingContainer" style="display:none;"></div>
+        </div>
+        
+        <!-- 输入区域 -->
+        <div class="input-area">
+            <input type="text" id="userInput" placeholder="输入消息... (按Enter发送)" autocomplete="off">
+            <button id="sendBtn">
+                <span>发送</span>
+                <span style="font-size: 12px;">↵</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // ================= 配置区域 =================
+        const API_KEY = "sk_ZmJkQl5UEobp0cmTWRetW4hXgGHq0MYLxbsJaLTi50I";
+        const API_URL = "https://api.ppinfra.com/v3/openai/chat/completions";
+        // ============================================
+
+        // 模型预设
+        const MODEL_PRESETS = {
+            "deepseek/deepseek-v3.1-terminus": {
+                name: "deepseek-v3.1-terminus",
+                avatar: "🔍",
+                description: "深度求索最新模型"
+            },
+            "xiaomimimo/mimo-v2-flash": {
+                name: "xiaomimimo/mimo-v2-flash",
+                avatar: "⚡",
+                description: "Mimo 快速经济模型"
+            },
+            "zai-org/glm-4.7": {
+                name: "zai-org/glm-4.7",
+                avatar: "🧠",
+                description: "智谱最强模型"
+            },
+            "qwen/qwen3-235b-a22b-instruct-2507": {
+                name: "qwen/qwen3-235b-a22b-instruct-2507",
+                avatar: "🤖",
+                description: "qwen模型"
+            },
+            "deepseek/deepseek-r1-0528": {
+                name: "deepseek/deepseek-r1-0528",
+                avatar: "✨",
+                description: "deepseek 最新模型"
+            }
+        };
+
+        const chatBox = document.getElementById('chatBox');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const streamingContainer = document.getElementById('streamingContainer');
+        const clearHistoryBtn = document.getElementById('clearHistory');
+        const exportHistoryBtn = document.getElementById('exportHistory');
+        const modelSelect = document.getElementById('modelSelect');
+
+        // 用户信息（模拟）
+        const userInfo = {
+            name: '用户',
+            avatar: '👤'
+        };
+
+        let aiInfo = {
+            name: '智能助手',
+            avatar: '🤖'
+        };
+
+        // 当前选择的模型
+        let currentModel = modelSelect.value;
+
+        // 从 localStorage 加载聊天记录和模型设置
+        let messages = JSON.parse(localStorage.getItem('ai_chat_history')) || [];
+        const savedModel = localStorage.getItem('selected_model');
+        if (savedModel && MODEL_PRESETS[savedModel]) {
+            modelSelect.value = savedModel;
+            currentModel = savedModel;
+            updateAiInfo();
+        }
+
+        // 保存聊天记录到 localStorage
+        function saveHistory() {
+            localStorage.setItem('ai_chat_history', JSON.stringify(messages));
+            localStorage.setItem('selected_model', currentModel);
+        }
+
+        // 更新AI信息
+        function updateAiInfo() {
+            const modelInfo = MODEL_PRESETS[currentModel] || MODEL_PRESETS["deepseek/deepseek-v3.1-terminus"];
+            aiInfo = {
+                name: modelInfo.name,
+                avatar: modelInfo.avatar,
+                description: modelInfo.description
+            };
+            
+            // 更新头部显示
+            const headerInfo = document.querySelector('.header-info');
+            if (headerInfo) {
+                headerInfo.querySelector('h2').textContent = aiInfo.name;
+                headerInfo.querySelector('p').textContent = aiInfo.description;
+            }
+            
+            // 更新AI头像
+            const aiAvatar = document.querySelector('.ai-avatar');
+            if (aiAvatar) {
+                aiAvatar.textContent = aiInfo.avatar;
+            }
+        }
+
+        // 清空聊天记录
+        function clearHistory() {
+            if (confirm('确定要清空所有聊天记录吗？此操作不可撤销。')) {
+                messages = [];
+                saveHistory();
+                loadChatHistory();
+                addWelcomeMessage();
+            }
+        }
+
+        // 导出聊天记录
+        function exportHistory() {
+            const historyText = messages.map(msg => {
+                const sender = msg.role === 'user' ? `${userInfo.name} (${userInfo.avatar})` : `${aiInfo.name} (${aiInfo.avatar})`;
+                return `【${sender}】${new Date(msg.timestamp).toLocaleString()}：\n${msg.content}\n${'─'.repeat(60)}`;
+            }).join('\n\n');
+            
+            const blob = new Blob([historyText], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `AI聊天记录_${new Date().toLocaleDateString().replace(/\//g, '-')}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            // 显示导出成功提示
+            showTempMessage('聊天记录导出成功！', 'success');
+        }
+
+        // 显示临时提示消息
+        function showTempMessage(text, type = 'info') {
+            const messageDiv = document.createElement('div');
+            messageDiv.style.cssText = `
+                position: fixed;
+                top: 100px;
+                right: 20px;
+                background: ${type === 'success' ? '#4CAF50' : '#2196F3'};
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 1000;
+                animation: slideInRight 0.3s ease;
+            `;
+            messageDiv.textContent = text;
+            document.body.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                messageDiv.style.animation = 'slideOutRight 0.3s ease';
+                setTimeout(() => document.body.removeChild(messageDiv), 300);
+            }, 2000);
+        }
+
+        // 添加欢迎消息
+        function addWelcomeMessage() {
+            const welcomeDiv = document.createElement('div');
+            welcomeDiv.className = 'welcome-message';
+            welcomeDiv.innerHTML = `
+                <div style="font-size: 48px; margin-bottom: 10px;">${aiInfo.avatar}</div>
+                <div style="font-size: 1.2rem; margin-bottom: 8px; color: #333;">欢迎使用 ${aiInfo.name}</div>
+                <div style="font-size: 0.9rem;">${aiInfo.description}</div>
+            `;
+            chatBox.appendChild(welcomeDiv);
+        }
+
+        // 创建消息元素（带头像）
+        function createMessageElement(isAi, content = '', timestamp = null) {
+            const container = document.createElement('div');
+            container.className = `message-container ${isAi ? 'ai' : 'user'}`;
+            
+            // 头像
+            const avatar = document.createElement('div');
+            avatar.className = `avatar ${isAi ? 'ai-avatar-small' : 'user-avatar'}`;
+            avatar.textContent = isAi ? aiInfo.avatar : userInfo.avatar;
+            avatar.title = isAi ? aiInfo.name : userInfo.name;
+            
+            // 消息气泡
+            const bubble = document.createElement('div');
+            bubble.className = `message-bubble ${isAi ? 'ai-bubble' : 'user-bubble'}`;
+            
+            // 时间戳
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            timeDiv.textContent = timestamp ? new Date(timestamp).toLocaleTimeString('zh-CN', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            }) : new Date().toLocaleTimeString('zh-CN', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+            
+            bubble.innerHTML = parseMarkdown(content);
+            bubble.appendChild(timeDiv);
+            
+            container.appendChild(avatar);
+            container.appendChild(bubble);
+            
+            return container;
+        }
+
+        // 加载聊天记录到界面
+        function loadChatHistory() {
+            chatBox.innerHTML = '';
+            chatBox.appendChild(streamingContainer);
+            streamingContainer.style.display = 'none';
+            
+            let lastDate = null;
+            
+            messages.forEach((msg, index) => {
+                // 检查是否需要显示日期分隔符
+                const msgDate = new Date(msg.timestamp).toDateString();
+                if (lastDate !== msgDate) {
+                    const timestampDiv = document.createElement('div');
+                    timestampDiv.className = 'timestamp';
+                    timestampDiv.textContent = new Date(msg.timestamp).toLocaleDateString('zh-CN', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric',
+                        weekday: 'long'
+                    });
+                    chatBox.appendChild(timestampDiv);
+                    lastDate = msgDate;
+                }
+                
+                const isAi = msg.role === 'assistant';
+                const messageElement = createMessageElement(isAi, msg.content, msg.timestamp);
+                chatBox.appendChild(messageElement);
+            });
+            
+            // 如果没有消息，显示欢迎信息
+            if (messages.length === 0) {
+                addWelcomeMessage();
+            }
+            
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // 兼容性处理：如果 marked 未加载，直接显示文本
+        function parseMarkdown(text) {
+            if (typeof marked !== 'undefined') {
+                return marked.parse(text);
+            }
+            return text.replace(/\n/g, '<br>');
+        }
+
+        // 更新消息内容（流式输出时使用）
+        function updateMessageContent(element, text, isStreaming) {
+            const bubble = element.querySelector('.message-bubble');
+            const timeDiv = bubble.querySelector('.message-time');
+            const contentHtml = parseMarkdown(text) + (isStreaming ? '<span class="cursor"></span>' : '');
+            
+            bubble.innerHTML = contentHtml;
+            if (timeDiv) {
+                bubble.appendChild(timeDiv);
+            }
+            
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // 发送消息处理
+        async function handleSend() {
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            // 1. 显示用户消息
+            const currentTime = new Date();
+            const userMessageElement = createMessageElement(false, text, currentTime.getTime());
+            chatBox.appendChild(userMessageElement);
+            userInput.value = '';
+
+            // 记录历史（带时间戳）
+            const userMessage = { 
+                role: "user", 
+                content: text,
+                timestamp: currentTime.getTime(),
+                model: currentModel // 记录使用的模型
+            };
+            messages.push(userMessage);
+            saveHistory();
+
+            // 2. 准备 AI 容器
+            const aiMessageElement = createMessageElement(true, '', currentTime.getTime());
+            chatBox.appendChild(aiMessageElement);
+            
+            let fullResponse = "";
+
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = '<span>思考中...</span>';
+            userInput.disabled = true;
+
+            try {
+                if (API_KEY === "YOUR_API_KEY_HERE") {
+                    throw new Error("请先修改代码中的 API_KEY！");
+                }
+
+                // 只发送最近10轮对话，避免token过长
+                const recentMessages = messages.slice(-20);
+                const apiMessages = recentMessages.map(msg => ({
+                    role: msg.role,
+                    content: msg.content
+                }));
+
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_KEY}`
+                    },
+                    body: JSON.stringify({
+                        model: currentModel,
+                        messages: apiMessages,
+                        stream: true,
+                    })
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData.error?.message || `HTTP 错误: ${response.status}`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const dataStr = line.slice(6);
+                            if (dataStr === '[DONE]') break;
+                            
+                            try {
+                                const data = JSON.parse(dataStr);
+                                const content = data.choices[0].delta.content || "";
+                                fullResponse += content;
+                                updateMessageContent(aiMessageElement, fullResponse, true);
+                            } catch (e) { /* 忽略解析错误 */ }
+                        }
+                    }
+                }
+
+            } catch (error) {
+                fullResponse += `\n[❌ 连接错误: ${error.message}]`;
+                updateMessageContent(aiMessageElement, fullResponse, false);
+            } finally {
+                updateMessageContent(aiMessageElement, fullResponse, false);
+                
+                // 保存AI回复到历史记录
+                const aiMessage = { 
+                    role: "assistant", 
+                    content: fullResponse,
+                    timestamp: new Date().getTime(),
+                    model: currentModel // 记录使用的模型
+                };
+                messages.push(aiMessage);
+                saveHistory();
+                
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = '<span>发送</span><span style="font-size: 12px;">↵</span>';
+                userInput.disabled = false;
+                userInput.focus();
+            }
+        }
+
+        // 事件监听
+        sendBtn.addEventListener('click', handleSend);
+        userInput.addEventListener('keypress', (e) => { 
+            if(e.key === 'Enter') handleSend(); 
+        });
+        clearHistoryBtn.addEventListener('click', clearHistory);
+        exportHistoryBtn.addEventListener('click', exportHistory);
+        
+        // 模型选择变化事件
+        modelSelect.addEventListener('change', function() {
+            currentModel = this.value;
+            updateAiInfo();
+            saveHistory();
+            
+            // 显示模型切换提示
+            const modelInfo = MODEL_PRESETS[currentModel];
+            showTempMessage(`已切换到 ${modelInfo.name} 模型`);
+        });
+
+        // 页面加载时显示历史记录
+        window.addEventListener('load', function() {
+            updateAiInfo();
+            loadChatHistory();
+        });
+
+        // 添加CSS动画
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideInRight {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOutRight {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
